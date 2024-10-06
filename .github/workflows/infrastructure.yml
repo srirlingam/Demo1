@@ -1,0 +1,63 @@
+name: Infrastructure Create & Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: "Trigger destroy step"
+        type: choice
+        required: true
+        options: 
+            - true
+            - false
+
+env:
+  AWS_REGION: "us-east-1"
+  TF_ACTIONS_WORKING_DIR: "./terraform" 
+
+jobs:
+  terraform:
+    name: "Terraform Plan and Apply"
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checkout the repository
+    - name: "Checkout repository"
+      uses: actions/checkout@v3
+
+    # Set up AWS credentials
+    - name: "Configure AWS Credentials"
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    # Install Terraform
+    - name: "Install Terraform"
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.9.5
+
+    # Terraform Init
+    - name: "Terraform Init"
+      working-directory: ${{ env.TF_ACTIONS_WORKING_DIR }}
+      run: terraform init
+
+    # Terraform Plan
+    - name: "Terraform Plan"
+      working-directory: ${{ env.TF_ACTIONS_WORKING_DIR }}
+      id: plan
+      run: terraform plan -out=tfplan
+
+    # Terraform Apply 
+    - name: "Terraform Apply"
+      if: inputs.destroy == 'false'
+      working-directory: ${{ env.TF_ACTIONS_WORKING_DIR }}
+      run: terraform apply -auto-approve tfplan
+
+    # Terraform Destroy (on manual trigger)
+    - name: "Terraform Destroy"
+      if: inputs.destroy == 'true'
+      working-directory: ${{ env.TF_ACTIONS_WORKING_DIR }}
+      run: terraform destroy -auto-approve
